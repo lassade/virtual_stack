@@ -2,7 +2,7 @@
 
 *The stack will never overflow if you have enough physical memory!*
 
-![](https://github.com/lassade/virtual_stack/actions/runs/220134826)
+[![](https://github.com/lassade/virtual_stack/workflows/Build/badge.svg)](https://github.com/lassade/virtual_stack/actions?query=workflow%3ABuild)
 
 ## Concept
 
