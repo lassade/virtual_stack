@@ -2,20 +2,22 @@
 
 The stack will never overflow if you have enough physical memory!
 
-====
+---
 
-### *NOTE* Don't use this code on production, it's just a proof of concept! 
-
-### *NOTE* Only `x86_64` requires rust nightly
+### Proof of concept
 
 Uses some assembly trickery to change the `RSP` (stack register) to point to
 a custom heap allocated memory address, and when it is nearly full allocate a
 new slab of data on the heap to be used as an stack.
 
+Don't use this code on production!
+
+### Only `x86_64` requires rust nightly
+
 Although this crate only has an `x86_64` implementation the same principles
 can be used for other architectures.
 
-Where's how to use:
+### Where's how to use it
 
 ```rust
 use virtual_stack::*;
