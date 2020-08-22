@@ -3,7 +3,7 @@
 #![feature(ptr_offset_from)]
 
 // use std::alloc::{alloc, dealloc, Layout};
-// use std::mem::{ManuallyDrop, MaybeUninit};
+use std::mem::{ManuallyDrop, MaybeUninit};
 
 extern crate test;
 
@@ -11,23 +11,25 @@ mod complex;
 mod simple;
 
 fn main() {
+    println!("fib(40): {}", fib(40));
+    println!("normal stack done!");
     // simple::exec();
     // println!("simple done!");
     complex::exec();
-    println!("complex done!");
+    println!("virtualized stack done!");
 }
 
-// #[inline(never)]
-// fn fib(n: usize) -> usize {
-//     // big stack allocation
-//     test::black_box(unsafe { MaybeUninit::<[u8; 4096]>::uninit().assume_init() });
+#[inline(never)]
+fn fib(n: usize) -> usize {
+    // big stack allocation
+    test::black_box(unsafe { MaybeUninit::<[u8; 180]>::uninit().assume_init() });
 
-//     if (n == 0) || (n == 1) {
-//         n
-//     } else {
-//         fib(n - 1) + fib(n - 2)
-//     }
-// }
+    if (n == 0) || (n == 1) {
+        n
+    } else {
+        fib(n - 1) + fib(n - 2)
+    }
+}
 
 // fn main() {
 //     const SIZE: usize = 2 * 1024 * 1024;

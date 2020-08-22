@@ -2,118 +2,98 @@ use std::alloc::{alloc, dealloc, Layout};
 use std::mem::MaybeUninit;
 use std::ptr::copy_nonoverlapping;
 
-struct Block {
+#[derive(Copy, Clone)]
+pub struct Slab {
     sp: *const u8,
     heap: *mut u8,
     size: usize,
 }
 
-struct VirtualStack {
-    blocks: Vec<Block>,
-}
-
-impl VirtualStack {
-    #[inline(always)]
-    fn new() -> Self {
-        Self { blocks: vec![] }
-    }
-}
-
-struct Fib {
-    virtual_stack: VirtualStack,
-}
+struct Fib {}
 
 impl Fib {
     fn new() -> Self {
-        Self {
-            virtual_stack: VirtualStack::new(),
-        }
+        Self {}
     }
 
     #[inline(never)]
-    fn __calc_code(&mut self, n: usize) -> usize {
-        println!("n: {}", n);
-
+    fn __calc_inner(&mut self, n: usize, s: Slab) -> usize {
         // big stack allocation
         test::black_box(unsafe { MaybeUninit::<[u8; 180]>::uninit().assume_init() });
 
+        let v;
         if (n == 0) || (n == 1) {
-            n
+            v = n
         } else {
-            self.calc(n - 1) + self.calc(n - 2)
+            v = self.calc(n - 1, Some(s)) + self.calc(n - 2, Some(s));
         }
+        v
     }
 
     #[inline(never)]
-    fn calc(&mut self, n: usize) -> usize {
-        // Should the block be discarded at the end?
-        let __v;
-        let mut __discard = false;
-        let mut __sp: *const u8 = std::ptr::null();
+    fn calc(&mut self, n: usize, s: Option<Slab>) -> usize {
+        let __v; // Return value
+        let mut __s; // Allocated or inherited stack slab,
+        let mut __discard = false; // Owns the stack `Slab` thus need to dealloc it at the end
+        let copy = 512; // TODO: figure out how many stack bytes we need to copy over when allocating a new stack `Slab`
 
         unsafe {
             // Save current stack pointer
-            asm!("mov {sp}, rsp", sp = out(reg) __sp,);
+            let mut sp: *const u8 = std::ptr::null();
+            asm!("mov {sp}, rsp", sp = out(reg) sp,);
 
-            let __stack = &mut self.virtual_stack;
-            if let Some(block) = __stack.blocks.pop() {
+            if let Some(slab) = s {
                 // Block still active
-                let offset = __sp.offset_from(block.heap).abs() as usize;
-                println!("offset: {}", offset);
+                let offset = sp.offset_from(slab.heap).abs() as usize;
                 if offset < 1024 {
-                    println!("change block");
-
                     // Running out of space allocate a new block with more
-                    let size = block.size * 2;
-                    let layout = Layout::from_size_align_unchecked(size, 8);
+                    let size = slab.size * 2;
+                    let layout = Layout::from_size_align_unchecked(size, 32);
                     let heap = alloc(layout);
                     __discard = true;
 
-                    __stack.blocks.push(block);
-                    __stack.blocks.push(Block {
-                        sp: __sp,
-                        heap,
-                        size,
-                    });
+                    __s = Slab { sp, heap, size };
 
+                    let mut vsp = heap.add(size - copy);
+                    // Copy the current stack frame to the new stack before activating it
+                    copy_nonoverlapping(sp, vsp, copy);
                     // Activate block
-                    let vsp = heap.add(size);
-                    asm!("mov rsp, {vsp}", vsp = in(reg) vsp);
+                    asm!("mov rsp, {vsp}", vsp = in(reg) vsp,);
                 } else {
-                    // Block still has some space left
-                    __stack.blocks.push(block);
+                    __s = slab;
                 }
             } else {
-                let size = 4096;
-                let layout = Layout::from_size_align_unchecked(size, 8);
+                let size = 64 * 1024;
+                let layout = Layout::from_size_align_unchecked(size, 32);
                 let heap = alloc(layout);
 
                 __discard = true;
-                __stack.blocks.push(Block {
-                    sp: __sp,
-                    heap,
-                    size,
-                });
+                __s = Slab { sp, heap, size };
 
-                // Activate block
-                let vsp = heap.add(size);
+                let mut vsp = heap.add(size - copy);
+                // Copy the current stack frame to the new stack before activating it
+                copy_nonoverlapping(sp, vsp, copy);
+                // Activate stack slab
                 asm!("mov rsp, {vsp}", vsp = in(reg) vsp,);
             }
         }
 
         // Call function
-        __v = self.__calc_code(n);
+        __v = self.__calc_inner(n, __s);
 
         unsafe {
-            // Restore stack pointer
-            asm!("mov rsp, {sp}", sp = in(reg) __sp,);
-
-            // Discard block
+            // Stack `Slab` changed!
             if __discard {
-                let __stack = &mut self.virtual_stack;
-                let block = __stack.blocks.pop().unwrap();
-                let layout = Layout::from_size_align_unchecked(block.size, 8);
-                dealloc(block.heap, layout);
+                let layout = Layout::from_size_align_unchecked(__s.size, 32);
+                dealloc(__s.heap, layout);
+
+                // Restore to previous `Slab` or the frame in the program stack
+                asm!(
+                    //"mov {v}, {v}", // Make the sp reg not the same as the return value reg
+                    "mov rsp, {sp}",
+                    //v = in(reg) __v,
+                    sp = in(reg) __s.sp
+                );
             }
         }
 
@@ -123,5 +103,6 @@ impl Fib {
 }
 
 pub fn exec() {
-    test::black_box(Fib::new().calc(10));
+    let f = test::black_box(Fib::new().calc(40, None));
+    println!("fib(40): {}", f);
 }
