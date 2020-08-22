@@ -2,8 +2,6 @@
 
 The stack will never overflow if you have enough physical memory!
 
----
-
 ### Proof of concept
 
 Uses some assembly trickery to change the `RSP` (stack register) to point to
