@@ -30,7 +30,7 @@ impl Rec {
 
         unsafe {
             // Save current stack pointer
-            let mut sp: *const u8 = std::ptr::null();
+            let sp: *const u8;
             asm!("mov {sp}, rsp", sp = out(reg) sp,);
 
             if let Some(slab) = s {
@@ -45,7 +45,7 @@ impl Rec {
 
                     __s = Slab { sp, heap, size };
 
-                    let mut vsp = heap.add(size - copy);
+                    let vsp = heap.add(size - copy);
                     // Copy the current stack frame to the new stack before activating it
                     copy_nonoverlapping(sp, vsp, copy);
                     // Activate block
@@ -62,32 +62,18 @@ impl Rec {
                 __discard = true;
                 __s = Slab { sp, heap, size };
 
-                let mut vsp = heap.add(size - copy);
+                let vsp = heap.add(size - copy);
                 // Copy the current stack frame to the new stack before activating it
                 copy_nonoverlapping(sp, vsp, copy);
                 // Activate stack slab
                 asm!("mov rsp, {vsp}", vsp = in(reg) vsp,);
             }
-
-            // asm!(
-            //     "push {0}",
-            //     "push {1}",
-            //     "push {2}",
-            //     in(reg) __s.sp, in(reg) __s.heap, in(reg) __s.size,
-            // );
         }
 
         // Call function
         __v = Self::__rec_inner(n, __s);
 
         unsafe {
-            // asm!(
-            //     "pop {2}",
-            //     "pop {1}",
-            //     "pop {0}",
-            //     out(reg) __s.sp, out(reg) __s.heap, out(reg) __s.size,
-            // );
-
             // Stack `Slab` changed!
             if __discard {
                 // Restore to previous `Slab` or the frame in the program stack

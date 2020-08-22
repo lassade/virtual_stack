@@ -8,13 +8,9 @@ use std::mem::MaybeUninit;
 use test::black_box;
 
 mod complex;
-mod simple;
 
 fn main() {
     const N: usize = 100_000;
-    // simple::exec();
-    // println!("simple done!");
-
     println!("virtualized stack");
     complex::rec(N);
     println!("done!");
