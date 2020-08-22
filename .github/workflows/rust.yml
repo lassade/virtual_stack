@@ -28,4 +28,4 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: Run tests
-        run: cargo test --workspace
+        run: cargo test --release

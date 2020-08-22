@@ -7,18 +7,19 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'virtual_stack'",
+            "name": "Debug unit tests in library 'virtual_stack'",
             "cargo": {
                 "args": [
                     "+nightly",
-                    "build",
+                    "test",
                     "--release",
-                    "--bin=virtual_stack",
+                    "--no-run",
+                    "--lib",
                     "--package=virtual_stack"
                 ],
                 "filter": {
                     "name": "virtual_stack",
-                    "kind": "bin"
+                    "kind": "lib"
                 }
             },
             "args": [],

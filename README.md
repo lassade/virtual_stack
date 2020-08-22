@@ -10,7 +10,7 @@ Uses some assembly trickery to change the `RSP` (stack register) to point to
 a custom heap allocated memory address, and when it is nearly full allocate a
 new slab of data on the heap to be used as an stack.
 
-### Only `x86_64` requires rust nightly
+### Only `x86_64` requires rust nightly in release mode
 
 Although this crate only has an `x86_64` implementation the same principles
 can be used for other architectures.
