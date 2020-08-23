@@ -98,7 +98,6 @@ unsafe impl<T, R, V: Recursive<T, R>> Caller<T, R> for V {
                     __s = slab;
                 }
             } else {
-                asm!("nop");
                 let size = Self::SIZE;
                 let layout = Layout::from_size_align_unchecked(size, 32);
                 let heap = alloc(layout);
@@ -121,12 +120,7 @@ unsafe impl<T, R, V: Recursive<T, R>> Caller<T, R> for V {
             // Stack `StackFrame` changed!
             if __discard {
                 // Restore to previous `StackFrame` or the frame in the program stack
-                asm!(
-                    "nop", // Make the sp reg not the same as the return value reg
-                    "mov rsp, {sp}",
-                    //v = in(reg) __v,
-                    sp = in(reg) __s.sp
-                );
+                asm!("mov rsp, {sp}", sp = in(reg) __s.sp);
 
                 let layout = Layout::from_size_align_unchecked(__s.size, 32);
                 dealloc(__s.heap, layout);
