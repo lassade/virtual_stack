@@ -14,9 +14,9 @@ new slab of data on the heap to be used as an stack.
 much more memory hungry. This lib will use 4 times more memory on debug mode in an
 attempt to make it work, but you may need to increase the amount of memory manually.
 
-### Only `x86_64` requires rust nightly
+### Only `x86_64` and requires rust nightly
 
-Although this crate only has an `x86_64` implementation the same principles
+Although this crate only has a `x86_64` implementation the same principles
 can be used for other architectures.
 
 ### Where's how to use it
@@ -27,6 +27,9 @@ use virtual_stack::*;
 struct Fib;
 
 impl Recursive<usize, usize> for Fib {
+    // You may also need to change the constants `SIZE`, `LEFT` and `COPY`
+    // to better control the stack properties
+
     fn call(n: usize, s: Option<StackFrame>) -> usize {
         if (n == 0) || (n == 1) {
             n
