@@ -42,13 +42,21 @@ pub struct StackFrame {
 /// ```
 pub trait Recursive<T, R = ()> {
     /// Start size of the virtualized stack
+    ///
+    /// A bigger stack prevents allocations as the code reuses the current stack,
+    /// while a smaller stack will need less memory.
     const SIZE: usize = 16 * 1024;
-    /// Create a new virtual stack with the double of the previous size when
-    /// this amount of bytes are left
-    const RESIZE: usize = 1024;
-    /// When creating the virtual stack a portion of the previous stack must
-    /// be copied over, so function can safely use the stack.
-    const NEEDED_STACK: usize = 512;
+    /// Number of bytes left in the stack to be considered full enough
+    /// to need allocate another one
+    ///
+    /// Must be always bigger than `Self::COPY`, bigger values wastes more memory
+    /// but lower values may lead to stack overflow
+    const LEFT: usize = 1024;
+    /// Copy this amount of bytes from the previous stack when allocating a
+    /// new one.
+    ///
+    /// Provide a sensible amount that match your function need to run.
+    const COPY: usize = 512;
 
     /// Main function logic, uses the previous virtual stack frame or none in case
     /// of the default program stack;
@@ -64,6 +72,7 @@ pub unsafe trait Caller<T, R> {
 }
 
 /// Recursive virtual stack caller for `x86_64`
+/// *NOTE* On debug mode it will need much more memory to work
 #[cfg(target_arch = "x86_64")]
 unsafe impl<T, R, V: Recursive<T, R>> Caller<T, R> for V {
     #[inline(never)]
@@ -80,7 +89,7 @@ unsafe impl<T, R, V: Recursive<T, R>> Caller<T, R> for V {
             if let Some(slab) = s {
                 // Block still active
                 let offset = sp.offset_from(slab.heap).abs() as usize;
-                if offset < Self::RESIZE {
+                if offset < memory_multiplayer(Self::LEFT) {
                     // Running out of space allocate a new block with more
                     let size = slab.size * 2;
                     let layout = Layout::from_size_align_unchecked(size, 32);
@@ -89,25 +98,25 @@ unsafe impl<T, R, V: Recursive<T, R>> Caller<T, R> for V {
 
                     __s = StackFrame { sp, heap, size };
 
-                    let vsp = heap.add(size - Self::NEEDED_STACK);
+                    let vsp = heap.add(size - memory_multiplayer(Self::COPY));
                     // Copy the current stack frame to the new stack before activating it
-                    copy_nonoverlapping(sp, vsp, Self::NEEDED_STACK);
+                    copy_nonoverlapping(sp, vsp, memory_multiplayer(Self::COPY));
                     // Activate block
                     asm!("mov rsp, {vsp}", vsp = in(reg) vsp,);
                 } else {
                     __s = slab;
                 }
             } else {
-                let size = Self::SIZE;
+                let size = memory_multiplayer(Self::SIZE);
                 let layout = Layout::from_size_align_unchecked(size, 32);
                 let heap = alloc(layout);
 
                 __discard = true;
                 __s = StackFrame { sp, heap, size };
 
-                let vsp = heap.add(size - Self::NEEDED_STACK);
+                let vsp = heap.add(size - memory_multiplayer(Self::COPY));
                 // Copy the current stack frame to the new stack before activating it
-                copy_nonoverlapping(sp, vsp, Self::NEEDED_STACK);
+                copy_nonoverlapping(sp, vsp, memory_multiplayer(Self::COPY));
                 // Activate stack slab
                 asm!("mov rsp, {vsp}", vsp = in(reg) vsp,);
             }
@@ -130,6 +139,19 @@ unsafe impl<T, R, V: Recursive<T, R>> Caller<T, R> for V {
         // Return result
         __v
     }
+}
+
+/// On debug mode it will automatically use 4 times more memory
+/// for copy, allocate and left in the virtual stack
+#[cfg(debug_assertions)]
+const fn memory_multiplayer(n: usize) -> usize {
+    n * 4
+}
+
+/// In release use the normal amount of memory
+#[cfg(not(debug_assertions))]
+const fn memory_multiplayer(n: usize) -> usize {
+    n
 }
 
 #[cfg(test)]

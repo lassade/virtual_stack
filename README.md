@@ -10,7 +10,11 @@ Uses some assembly trickery to change the `RSP` (stack register) to point to
 a custom heap allocated memory address, and when it is nearly full allocate a
 new slab of data on the heap to be used as an stack.
 
-### Only `x86_64` requires rust nightly in release mode
+**Debug and release modes have different stack requirements**, been the debug mode
+much more memory hungry. This lib will use 4 times more memory on debug mode in an
+attempt to make it work, but you may need to increase the amount of memory manually.
+
+### Only `x86_64` requires rust nightly
 
 Although this crate only has an `x86_64` implementation the same principles
 can be used for other architectures.
